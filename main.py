@@ -1,13 +1,40 @@
-import smbus  # import SMBus module of I2C
-from time import sleep  # import sleep
+import argparse
+import time
 import math
-import os  # import os module
-import RPi.GPIO as GPIO
-import serial
 
-SERIAL_PORT = "/dev/ttyS0"
+# Argument parsing
+parser = argparse.ArgumentParser(description='MPU6050 Data Reader')
+parser.add_argument('--sim', action='store_true', help='Run in simulation mode')
+args = parser.parse_args()
 
-ser = serial.Serial(SERIAL_PORT, baudrate=9600, timeout=5)
+# Conditional imports and mocking for simulation
+if args.sim:
+    from unittest.mock import MagicMock
+    import sys
+
+    # Mocking RPi.GPIO and smbus for simulation
+    sys.modules['RPi'] = MagicMock()
+    sys.modules['RPi.GPIO'] = MagicMock()
+    sys.modules['smbus'] = MagicMock()
+
+    import smbus
+    import serial
+
+    # Mocking smbus
+    bus = smbus.SMBus(1)
+    bus.write_byte_data = MagicMock()
+    bus.read_byte_data = MagicMock(return_value=0)
+
+    # Mocking serial
+    SERIAL_PORT = "/dev/ttyS0"
+    ser = MagicMock()
+
+else:
+    import smbus
+    import serial
+
+    SERIAL_PORT = "/dev/ttyS0"
+    ser = serial.Serial(SERIAL_PORT, baudrate=9600, timeout=5)
 
 # MPU6050 Registers and their Address
 PWR_MGMT_1 = 0x6B
@@ -22,57 +49,39 @@ GYRO_XOUT_H = 0x43
 GYRO_YOUT_H = 0x45
 GYRO_ZOUT_H = 0x47
 
-
+# Initialize MPU6050
 def MPU_Init():
-    # write to sample rate register
     bus.write_byte_data(Device_Address, SMPLRT_DIV, 7)
-
-    # Write to power management register
     bus.write_byte_data(Device_Address, PWR_MGMT_1, 1)
-
-    # Write to Configuration register
     bus.write_byte_data(Device_Address, CONFIG, 0)
-
-    # Write to Gyro configuration register
     bus.write_byte_data(Device_Address, GYRO_CONFIG, 24)
-
-    # Write to interrupt enable register
     bus.write_byte_data(Device_Address, INT_ENABLE, 1)
 
-
+# Read raw data from MPU6050
 def read_raw_data(addr):
-    # Accelero and Gyro value are 16-bit
     high = bus.read_byte_data(Device_Address, addr)
     low = bus.read_byte_data(Device_Address, addr + 1)
-
-    # concatenate higher and lower value
-    value = ((high << 8) | low)
-
-    # to get signed value from mpu6050
+    value = (high << 8) | low
     if value > 32768:
         value = value - 65536
     return value
 
-
-bus = smbus.SMBus(1)  # or bus = smbus.SMBus(0) for older version boards
 Device_Address = 0x68  # MPU6050 device address
 
-MPU_Init()
+if not args.sim:
+    MPU_Init()
 
 print("Reading Data of Gyroscope and Accelerometer")
 
 while True:
-    # Read Accelerometer raw value
     acc_x = read_raw_data(ACCEL_XOUT_H)
     acc_y = read_raw_data(ACCEL_YOUT_H)
     acc_z = read_raw_data(ACCEL_ZOUT_H)
 
-    # Read Gyroscope raw value
     gyro_x = read_raw_data(GYRO_XOUT_H)
     gyro_y = read_raw_data(GYRO_YOUT_H)
     gyro_z = read_raw_data(GYRO_ZOUT_H)
 
-    # Full scale range +/- 250 degree/C as per sensitivity scale factor
     Ax = acc_x / 16384.0
     Ay = acc_y / 16384.0
     Az = acc_z / 16384.0
@@ -103,18 +112,18 @@ while True:
     if string == 'fall':
         ser.write(str.encode("AT+CMGF=1\r"))
         print("Text mode enabled")
-        sleep(3)
+        time.sleep(3)
         ser.write(str.encode('AT+CMGS="9629204756"\r'))
         msg = "Fall Detected"
         print("sending message")
-        sleep(3)
+        time.sleep(3)
         ser.write(str.encode(msg + chr(26)))
-        sleep(3)
+        time.sleep(3)
         print("sent")
         ser.write(str.encode("ATD9629204756;\r"))
         print("Dialing")
 
-        sleep(20)
+        time.sleep(20)
         ser.write(str.encode("ATH\r"))
         print("Calling")
-    sleep(0.002)
+    time.sleep(0.002)
