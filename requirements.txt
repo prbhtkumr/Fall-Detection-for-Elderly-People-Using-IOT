@@ -1,3 +1,5 @@
 serial
 smbus
+rpi.gpio
+pyserial
 fake-rpi
