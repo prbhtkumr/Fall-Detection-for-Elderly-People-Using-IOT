@@ -48,7 +48,7 @@ def MPU_Init():
     bus.write_byte_data(Device_Address, GYRO_CONFIG, 24)
 
     # Write to interrupt enable register
-    bus.write_byte_data(Device_Address, INT_ENABLE, 1
+    bus.write_byte_data(Device_Address, INT_ENABLE, 1)
 
 
 def read_raw_data(addr):
