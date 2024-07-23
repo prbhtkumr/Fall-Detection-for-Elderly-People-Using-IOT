@@ -1,0 +1,3 @@
+serial
+smbus
+fake-rpi
